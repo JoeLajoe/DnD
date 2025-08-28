@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D&D Turn Timer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 30px;
+        }
+
+        #timer-label {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            font-size: 16px;
+            padding: 8px 16px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        #progress-container {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .segment {
+            width: 15px;
+            height: 25px;
+            margin: 1px;
+            background-color: lightgray;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>D&D Turn Timer</h1>
+    <div id="timer-label">Select duration and press Start</div>
+
+    <div id="progress-container"></div>
+
+    <div>
+        <button class="btn" onclick="setDuration(60)">60 sec</button>
+        <button class="btn" onclick="setDuration(90)">90 sec</button>
+        <button class="btn" onclick="setDuration(120)">120 sec</button>
+    </div>
+
+    <div>
+        <button class="btn" onclick="startTimer()">Start</button>
+        <button class="btn" id="pause-btn" onclick="pauseResumeTimer()">Pause</button>
+        <button class="btn" onclick="resetTimer()">Reset</button>
+        <button class="btn" onclick="stopTimer()">Stop</button>
+    </div>
+
+    <script>
+        let TURN_TIME = 60;
+        let remainingTime = TURN_TIME;
+        let timerRunning = false;
+        let paused = false;
+        let interval = null;
+        const numSegments = 20;
+
+        const progressContainer = document.getElementById('progress-container');
+        const timerLabel = document.getElementById('timer-label');
+        const pauseBtn = document.getElementById('pause-btn');
+
+        function createSegments() {
+            progressContainer.innerHTML = '';
+            for (let i = 0; i < numSegments; i++) {
+                const div = document.createElement('div');
+                div.classList.add('segment');
+                progressContainer.appendChild(div);
+            }
+        }
+
+        function fillSegments() {
+            const segments = document.querySelectorAll('.segment');
+            const filledCount = Math.floor(((TURN_TIME - remainingTime) / TURN_TIME) * numSegments);
+            segments.forEach((seg, idx) => {
+                if (idx < filledCount) {
+                    const percent = idx / numSegments;
+                    if (percent < 0.5) seg.style.backgroundColor = 'green';
+                    else if (percent < 0.8) seg.style.backgroundColor = 'yellow';
+                    else seg.style.backgroundColor = 'red';
+                } else {
+                    seg.style.backgroundColor = 'lightgray';
+                }
+            });
+        }
+
+        function setDuration(seconds) {
+            TURN_TIME = seconds;
+            remainingTime = TURN_TIME;
+            timerLabel.textContent = `${remainingTime} seconds remaining`;
+            createSegments();
+            fillSegments();
+            paused = false;
+            timerRunning = false;
+            pauseBtn.textContent = 'Pause';
+        }
+
+        function startTimer() {
+            if (!timerRunning) {
+                timerRunning = true;
+                paused = false;
+                pauseBtn.textContent = 'Pause';
+                interval = setInterval(() => {
+                    if (!paused) {
+                        if (remainingTime > 0) {
+                            remainingTime--;
+                            timerLabel.textContent = `${remainingTime} seconds remaining`;
+                            fillSegments();
+                        } else {
+                            timerLabel.textContent = `⏰ Time's up!`;
+                            fillSegments();
+                            stopTimer();
+                        }
+                    }
+                }, 1000);
+            }
+        }
+
+        function pauseResumeTimer() {
+            if (timerRunning) {
+                paused = !paused;
+                pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+                if (paused) timerLabel.textContent = `Paused at ${remainingTime} seconds`;
+            }
+        }
+
+        function resetTimer() {
+            remainingTime = TURN_TIME;
+            paused = false;
+            timerRunning = false;
+            clearInterval(interval);
+            pauseBtn.textContent = 'Pause';
+            timerLabel.textContent = `${remainingTime} seconds remaining`;
+            createSegments();
+            fillSegments();
+        }
+
+        function stopTimer() {
+            timerRunning = false;
+            paused = false;
+            clearInterval(interval);
+            pauseBtn.textContent = 'Pause';
+            timerLabel.textContent = `Timer stopped`;
+        }
+
+        setDuration(TURN_TIME);
+    </script>
+
+</body>
+
+</html>
