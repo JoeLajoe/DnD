@@ -1,0 +1,198 @@
+x<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Combat Health Tracker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #1e1e2f;
+      color: #f0f0f0;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .container {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+    }
+    .section {
+      width: 45%;
+      min-width: 300px;
+    }
+    .card {
+      background: #2c2c40;
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 10px;
+      position: relative;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    }
+    .card h3 {
+      margin: 0 0 5px 0;
+    }
+    .hp {
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+    .buttons button, .delete, .add-btn, .apply-btn {
+      margin: 2px;
+      padding: 5px 10px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .buttons button { background: #444; color: #fff; }
+    .delete { 
+      background: crimson; 
+      color: white; 
+      position: absolute; 
+      top: 10px; 
+      right: 10px; 
+    }
+    .add-btn { background: #4caf50; color: white; }
+    .apply-btn { background: #2196f3; color: white; }
+    input {
+      margin: 5px;
+      padding: 5px;
+      border-radius: 5px;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Combat Health Tracker</h1>
+  
+  <div style="text-align:center; margin-bottom:20px;">
+    <input id="name" placeholder="Name">
+    <input id="hp" type="number" placeholder="HP">
+    <select id="type">
+      <option value="player">Player</option>
+      <option value="monster">Monster</option>
+    </select>
+    <button class="add-btn" onclick="addCharacter()">Add</button>
+  </div>
+  
+  <div class="container">
+    <div class="section">
+      <h2>Players</h2>
+      <div id="players"></div>
+    </div>
+    <div class="section">
+      <h2>Monsters</h2>
+      <div id="monsters"></div>
+    </div>
+  </div>
+  
+  <script>
+    let characters = JSON.parse(localStorage.getItem('characters')) || [];
+
+    function saveData() {
+      localStorage.setItem('characters', JSON.stringify(characters));
+    }
+
+    function getHealthColor(current, max) {
+      const ratio = current / max;
+      if (ratio > 0.5) return 'lightgreen';
+      if (ratio > 0.25) return 'orange';
+      return 'red';
+    }
+
+    function render() {
+      document.getElementById('players').innerHTML = '';
+      document.getElementById('monsters').innerHTML = '';
+
+      characters.forEach((char, index) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+
+        const title = document.createElement('h3');
+        title.textContent = char.name;
+        card.appendChild(title);
+
+        const hp = document.createElement('div');
+        hp.className = 'hp';
+        hp.style.color = getHealthColor(char.hp, char.maxHp);
+        hp.textContent = `HP: ${char.hp} / ${char.maxHp}`;
+        card.appendChild(hp);
+
+        // Quick buttons
+        const buttons = document.createElement('div');
+        buttons.className = 'buttons';
+        [-5, -1, +1, +5].forEach(amount => {
+          const btn = document.createElement('button');
+          btn.textContent = (amount > 0 ? `+${amount}` : amount);
+          btn.onclick = () => {
+            char.hp = Math.max(0, char.hp + amount);
+            if (char.hp > char.maxHp) char.hp = char.maxHp;
+            saveData();
+            render();
+          };
+          buttons.appendChild(btn);
+        });
+        card.appendChild(buttons);
+
+        // Custom input
+        const customDiv = document.createElement('div');
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.placeholder = "±HP";
+        input.style.width = "60px";
+        const applyBtn = document.createElement('button');
+        applyBtn.textContent = "Apply";
+        applyBtn.className = "apply-btn";
+        applyBtn.onclick = () => {
+          let val = parseInt(input.value);
+          if (!isNaN(val)) {
+            char.hp = Math.max(0, char.hp + val);
+            if (char.hp > char.maxHp) char.hp = char.maxHp;
+            saveData();
+            render();
+          }
+        };
+        customDiv.appendChild(input);
+        customDiv.appendChild(applyBtn);
+        card.appendChild(customDiv);
+
+        // Delete
+        const del = document.createElement('button');
+        del.className = 'delete';
+        del.textContent = 'X';
+        del.onclick = () => {
+          characters.splice(index, 1);
+          saveData();
+          render();
+        };
+        card.appendChild(del);
+
+        if (char.type === 'player') {
+          document.getElementById('players').appendChild(card);
+        } else {
+          document.getElementById('monsters').appendChild(card);
+        }
+      });
+    }
+
+    function addCharacter() {
+      const name = document.getElementById('name').value.trim();
+      const hp = parseInt(document.getElementById('hp').value);
+      const type = document.getElementById('type').value;
+      if (!name || isNaN(hp) || hp <= 0) return alert("Enter valid name and HP!");
+
+      characters.push({ name, hp, maxHp: hp, type });
+      saveData();
+      render();
+
+      document.getElementById('name').value = '';
+      document.getElementById('hp').value = '';
+    }
+
+    render();
+  </script>
+</body>
+</html>
