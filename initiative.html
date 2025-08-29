@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Initiative Tracker</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #1e1e2f;
+    color: #f0f0f0;
+    margin: 0;
+    padding: 20px;
+  }
+  h1, h2 { text-align: center; }
+  .container { max-width: 500px; margin: auto; }
+  .card {
+    background: #2c2c40;
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .current { background: #4444aa; }
+  input, select { margin: 5px; padding: 5px; border-radius: 5px; border: none; }
+  button { margin: 2px; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+  .delete { background: crimson; color: white; border: none; }
+  .add-btn { background: #4caf50; color: white; border: none; }
+  .next-btn, .reset-btn { background: #2196f3; color: white; border: none; }
+</style>
+</head>
+<body>
+
+<h1>⚔️ D&D Initiative Tracker</h1>
+
+<div class="container">
+  <h2>Add Character</h2>
+  <input id="name" placeholder="Name">
+  <input id="initiative" type="number" placeholder="Initiative">
+  <select id="type">
+    <option value="player">Player</option>
+    <option value="monster">Monster</option>
+  </select>
+  <button class="add-btn" onclick="addCharacter()">Add</button>
+
+  <h2>Initiative Order</h2>
+  <div id="initiative-list"></div>
+
+  <div style="text-align:center; margin-top: 10px;">
+    <button class="next-btn" onclick="nextTurn()">Next Turn</button>
+    <button class="reset-btn" onclick="resetTurns()">Reset</button>
+  </div>
+</div>
+
+<script>
+let characters = JSON.parse(localStorage.getItem('initiativeChars')) || [];
+let currentIndex = 0;
+
+function saveData() {
+  localStorage.setItem('initiativeChars', JSON.stringify(characters));
+}
+
+function render() {
+  characters.sort((a, b) => b.initiative - a.initiative); // highest first
+  const list = document.getElementById('initiative-list');
+  list.innerHTML = '';
+
+  characters.forEach((char, idx) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    if(idx === currentIndex) card.classList.add('current');
+
+    const info = document.createElement('div');
+    info.textContent = `${char.name} (${char.type}) - Init: ${char.initiative}`;
+    card.appendChild(info);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'delete';
+    delBtn.textContent = 'X';
+    delBtn.onclick = () => {
+      characters.splice(idx,1);
+      if(currentIndex >= characters.length) currentIndex = 0;
+      saveData();
+      render();
+    };
+    card.appendChild(delBtn);
+
+    list.appendChild(card);
+  });
+}
+
+function addCharacter() {
+  const name = document.getElementById('name').value.trim();
+  const initiative = parseInt(document.getElementById('initiative').value);
+  const type = document.getElementById('type').value;
+
+  if(!name || isNaN(initiative)) return alert("Enter valid name and initiative!");
+  characters.push({name, initiative, type});
+  saveData();
+  render();
+
+  document.getElementById('name').value = '';
+  document.getElementById('initiative').value = '';
+}
+
+function nextTurn() {
+  if(characters.length === 0) return;
+  currentIndex = (currentIndex + 1) % characters.length;
+  render();
+}
+
+function resetTurns() {
+  currentIndex = 0;
+  render();
+}
+
+render();
+</script>
+
+</body>
+</html>
