@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Character Tracker</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #1e1e2f;
+    color: #f0f0f0;
+    margin: 0;
+    padding: 20px;
+    text-align: center;
+  }
+  h1 { margin-bottom: 15px; }
+  .card {
+    background: #2c2c40;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 15px auto;
+    max-width: 450px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+  }
+  input, select, button {
+    margin: 5px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: none;
+    font-size: 14px;
+  }
+  button { cursor: pointer; font-weight: bold; }
+  .save-btn { background: #4caf50; color: white; }
+  .apply-btn { background: #2196f3; color: white; }
+  .hp-bar {
+    width: 100%;
+    background: #444;
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 10px 0;
+    height: 25px;
+  }
+  .hp-fill {
+    height: 100%;
+    background: lightgreen;
+    width: 100%;
+    text-align: center;
+    line-height: 25px;
+    font-weight: bold;
+    color: black;
+    transition: width 0.3s;
+  }
+  .slots { display: flex; justify-content: center; flex-wrap: wrap; margin: 5px 0; }
+  .slot {
+    width: 28px; height: 28px; margin: 3px;
+    border-radius: 50%; background: green; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .used { background: red !important; }
+  @media (max-width: 500px) {
+    .card { width: 90%; padding: 15px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Character Tracker</h1>
+
+<div class="card">
+  <h2>Character Info</h2>
+  <input id="charName" placeholder="Name">
+  <input id="charClass" placeholder="Class">
+  <input id="charLevel" type="number" placeholder="Level" min="1" max="20">
+  <input id="maxHp" type="number" placeholder="Max HP">
+  <button class="save-btn" onclick="saveCharacter()">Save</button>
+</div>
+
+<div class="card">
+  <h2 id="charDisplay"></h2>
+  
+  <div class="hp-bar">
+    <div class="hp-fill" id="hpFill"></div>
+  </div>
+
+  <div>
+    <button onclick="changeHP(-5)">-5</button>
+    <button onclick="changeHP(-1)">-1</button>
+    <button onclick="changeHP(1)">+1</button>
+    <button onclick="changeHP(5)">+5</button>
+    <input id="customHp" type="number" placeholder="±HP" style="width:60px">
+    <button class="apply-btn" onclick="applyCustomHP()">Apply</button>
+  </div>
+
+  <h3>Spell Slots</h3>
+  <div id="spellSlots"></div>
+  <button onclick="resetSlots()" class="apply-btn">Reset All Slots</button>
+</div>
+
+<script>
+const spellSlotTable = {
+  1: {1:2},
+  2: {1:3},
+  3: {1:4,2:2},
+  4: {1:4,2:3},
+  5: {1:4,2:3,3:2},
+  6: {1:4,2:3,3:3},
+  7: {1:4,2:3,3:3,4:1},
+  8: {1:4,2:3,3:3,4:2},
+  9: {1:4,2:3,3:3,4:3,5:1},
+  10:{1:4,2:3,3:3,4:3,5:2},
+  11:{1:4,2:3,3:3,4:3,5:2,6:1},
+  12:{1:4,2:3,3:3,4:3,5:2,6:1},
+  13:{1:4,2:3,3:3,4:3,5:2,6:1,7:1},
+  14:{1:4,2:3,3:3,4:3,5:2,6:1,7:1},
+  15:{1:4,2:3,3:3,4:3,5:2,6:1,7:1,8:1},
+  16:{1:4,2:3,3:3,4:3,5:2,6:1,7:1,8:1},
+  17:{1:4,2:3,3:3,4:3,5:2,6:1,7:1,8:1,9:1},
+  18:{1:4,2:3,3:3,4:3,5:3,6:1,7:1,8:1,9:1},
+  19:{1:4,2:3,3:3,4:3,5:3,6:2,7:1,8:1,9:1},
+  20:{1:4,2:3,3:3,4:3,5:3,6:2,7:2,8:1,9:1}
+};
+
+let character = JSON.parse(localStorage.getItem('myCharacter')) || {
+  name:'', classLevel:'', level:1, maxHp:20, hp:20, slots:{1:2}
+};
+
+function saveCharacter() {
+  const name = document.getElementById('charName').value;
+  const cls = document.getElementById('charClass').value;
+  let lvl = parseInt(document.getElementById('charLevel').value);
+  const maxHp = parseInt(document.getElementById('maxHp').value);
+  if(name) character.name = name;
+  if(cls) character.classLevel = cls;
+  if(!isNaN(lvl) && lvl>=1 && lvl<=20) {
+    character.level = lvl;
+    character.slots = JSON.parse(JSON.stringify(spellSlotTable[lvl])); // reset slots
+  }
+  if(!isNaN(maxHp) && maxHp>0) { character.maxHp = maxHp; if(character.hp>maxHp) character.hp=maxHp; }
+  localStorage.setItem('myCharacter', JSON.stringify(character));
+  render();
+}
+
+function changeHP(amount) {
+  character.hp = Math.max(0, Math.min(character.maxHp, character.hp + amount));
+  localStorage.setItem('myCharacter', JSON.stringify(character));
+  render();
+}
+
+function applyCustomHP() {
+  const val = parseInt(document.getElementById('customHp').value);
+  if(!isNaN(val)) changeHP(val);
+  document.getElementById('customHp').value = '';
+}
+
+function getHPPercent() {
+  return (character.hp/character.maxHp)*100;
+}
+
+function getHPColor() {
+  const ratio = character.hp / character.maxHp;
+  if(ratio>0.5) return 'lightgreen';
+  if(ratio>0.25) return 'orange';
+  return 'red';
+}
+
+function render() {
+  document.getElementById('charDisplay').textContent = `${character.name} - ${character.classLevel} (Lvl ${character.level})`;
+  
+  const hpFill = document.getElementById('hpFill');
+  hpFill.style.width = getHPPercent() + '%';
+  hpFill.style.background = getHPColor();
+  hpFill.textContent = `HP: ${character.hp} / ${character.maxHp}`;
+
+  // Spell slots
+  const container = document.getElementById('spellSlots');
+  container.innerHTML = '';
+  for(let lvl in character.slots){
+    const row = document.createElement('div');
+    row.innerHTML = `<strong>Level ${lvl}:</strong>`;
+    const slotDiv = document.createElement('div');
+    slotDiv.className = 'slots';
+    
+    for(let i=0;i<character.slots[lvl];i++){
+      const dot = document.createElement('div');
+      dot.className='slot';
+      dot.onclick = () => { dot.classList.toggle('used'); };
+      slotDiv.appendChild(dot);
+    }
+    row.appendChild(slotDiv);
+    container.appendChild(row);
+  }
+}
+
+function resetSlots() {
+  document.querySelectorAll('.slot').forEach(dot => dot.classList.remove('used'));
+}
+
+render();
+</script>
+
+</body>
+</html>
