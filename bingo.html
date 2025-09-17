@@ -1,32 +1,14 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
 
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Hallowed Hand Bingo</title>
 
-    <!-- 1) Configure Tailwind to use class-based dark mode -->
     <script>
         tailwind = { config: { darkMode: 'class' } };
     </script>
-
-    <!-- 2) Set initial theme ASAP to avoid flash -->
-    <script>
-        (function () {
-            try {
-                const ls = localStorage.getItem("hh-dark");
-                const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-                const dark = ls === "1" ? true : (ls === "0" ? false : prefersDark);
-                document.documentElement.classList.toggle("dark", dark);
-            } catch (e) {
-                // If anything goes wrong, fall back to system preference
-                const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-                document.documentElement.classList.toggle("dark", prefersDark);
-            }
-        })();
-    </script>
-
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
@@ -46,7 +28,7 @@
     </style>
 </head>
 
-<body class="min-h-screen bg-slate-50 dark:bg-slate-900 dark:text-slate-100 text-slate-900">
+<body class="min-h-screen bg-slate-900 text-slate-100">
     <noscript>
         <div class="max-w-2xl mx-auto p-6">This page requires JavaScript.</div>
     </noscript>
@@ -60,7 +42,6 @@
     <script type="text/babel">
         const { useMemo, useState, useEffect } = React;
 
-        // ======= Data =======
         const ENTRIES = [
             "Forgets their turn", "This might be a trap", "Nat 20 save", "Checks coin / magic item", "Melee complains about ranged",
             "Potion used in combat", "Argues about routes", "Crit hit changes fight", "Complains about cold", "DM describes snow",
@@ -69,7 +50,6 @@
             "Nat 1 fail", "Finds something unexpected", "Timer runs out", "Discovers a mysterious clue", "Tries to talk their way out of trouble", "Tries to bribe their way out of trouble",
         ];
 
-        // ======= RNG / Board helpers =======
         function mulberry32(seed) {
             let a = seed >>> 0;
             return function () {
@@ -92,7 +72,6 @@
             return [...pool.slice(0, 12), "FREE", ...pool.slice(12)];
         }
 
-        // ======= Bingo lines =======
         const LINES = (() => {
             const lines = [];
             for (let r = 0; r < 5; r++) lines.push([0, 1, 2, 3, 4].map(c => r * 5 + c));
@@ -107,7 +86,6 @@
             return set;
         }
 
-        // ======= Same-device persistence: seed in URL + localStorage =======
         function getInitialSeed() {
             const url = new URL(window.location.href);
             const fromUrl = url.searchParams.get("seed");
@@ -119,11 +97,10 @@
             return Math.floor(Math.random() * 2 ** 31);
         }
 
-        // ======= Components =======
         function BingoGrid({ cells, boardKey }) {
             const stored = localStorage.getItem(boardKey);
             const initial = stored ? JSON.parse(stored) : Array(25).fill(false);
-            if (!stored) initial[12] = true; // center FREE
+            if (!stored) initial[12] = true;
 
             const [marked, setMarked] = useState(initial);
             const [didBingo, setDidBingo] = useState(false);
@@ -161,10 +138,10 @@
                                         "text-[11px] sm:text-xs md:text-sm leading-snug whitespace-pre-line " +
                                         "transition select-none " +
                                         (inBingo
-                                            ? "bg-green-300 dark:bg-emerald-700/60 border-green-500 "
+                                            ? "bg-green-300 border-green-500 "
                                             : isMarked
-                                                ? "bg-blue-200 dark:bg-blue-800/60 border-blue-400 "
-                                                : "bg-white dark:bg-slate-900/60 border-slate-300 dark:border-slate-700 "
+                                                ? "bg-blue-200 border-blue-400 "
+                                                : "bg-slate-800 border-slate-700 text-slate-100 "
                                         ) +
                                         (isFree ? "font-semibold " : "") +
                                         "hover:shadow-sm active:scale-[0.99]"
@@ -176,7 +153,7 @@
                         })}
                     </div>
                     <div className="flex gap-2 mt-3">
-                        <button onClick={clearAll} className="px-3 py-2 rounded-2xl bg-white dark:bg-slate-800 border shadow">Clear</button>
+                        <button onClick={clearAll} className="px-3 py-2 rounded-2xl bg-slate-800 border shadow">Clear</button>
                         {hasBingo(marked) && <span className="px-3 py-2 rounded-2xl bg-emerald-600 text-white">BINGO!</span>}
                     </div>
                 </div>
@@ -187,22 +164,12 @@
             const [seed, setSeed] = useState(getInitialSeed);
             const [count, setCount] = useState(1);
 
-            // Initialize React state for theme from the actual <html> class
-            const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
-
-            // keep URL + LS in sync with the current seed
             useEffect(() => {
                 const url = new URL(window.location.href);
                 url.searchParams.set("seed", String(seed));
                 history.replaceState(null, "", url.toString());
                 localStorage.setItem("hh-seed", String(seed));
             }, [seed]);
-
-            // persist dark mode + flip the <html> class
-            useEffect(() => {
-                document.documentElement.classList.toggle("dark", dark);
-                localStorage.setItem("hh-dark", dark ? "1" : "0");
-            }, [dark]);
 
             const boards = useMemo(() => {
                 const rng = mulberry32(seed);
@@ -217,26 +184,23 @@
                         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6 print:hidden">
                             <div>
                                 <h1 className="text-3xl font-bold">Hallowed Hand - Bingo</h1>
-                                <p className="text-sm text-slate-600 dark:text-slate-400">
+                                <p className="text-sm text-slate-400">
                                     Click squares to mark them. Hit Randomize to get your unique board.
                                 </p>
                             </div>
                             <div className="flex gap-2">
                                 <button onClick={randomize} className="px-4 py-2 rounded-2xl bg-slate-900 text-white shadow">Randomize</button>
-                                <button onClick={() => setDark(d => !d)} className="px-4 py-2 rounded-2xl bg-white dark:bg-slate-800 border shadow">
-                                    {dark ? "Light Mode" : "Dark Mode"}
-                                </button>
                             </div>
                         </div>
 
                         {boards.map(({ cells, idx }) => (
-                            <div key={idx} className="bg-white dark:bg-slate-800 rounded-2xl shadow p-4 print:avoid-break max-w-2xl w-[min(92vw,42rem)] mx-auto">
+                            <div key={idx} className="bg-slate-800 rounded-2xl shadow p-4 print:avoid-break max-w-2xl w-[min(92vw,42rem)] mx-auto">
                                 <div className="flex items-baseline justify-between mb-3">
                                     <h2 className="text-xl font-semibold">Your Board</h2>
-                                    <span className="text-xs text-slate-500 dark:text-slate-400">seed:{seed}</span>
+                                    <span className="text-xs text-slate-400">seed:{seed}</span>
                                 </div>
                                 <BingoGrid cells={cells} boardKey={`hhbingo-${seed}-${idx}`} />
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Center is FREE. Progress saves in your browser.</p>
+                                <p className="text-xs text-slate-400 mt-2">Center is FREE. Progress saves in your browser.</p>
                             </div>
                         ))}
                     </div>
