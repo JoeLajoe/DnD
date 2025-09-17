@@ -1,14 +1,32 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
 
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Hallowed Hand Bingo</title>
 
+    <!-- 1) Configure Tailwind to use class-based dark mode -->
     <script>
-        tailwind.config = { darkMode: 'class' };
+        tailwind = { config: { darkMode: 'class' } };
     </script>
+
+    <!-- 2) Set initial theme ASAP to avoid flash -->
+    <script>
+        (function () {
+            try {
+                const ls = localStorage.getItem("hh-dark");
+                const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+                const dark = ls === "1" ? true : (ls === "0" ? false : prefersDark);
+                document.documentElement.classList.toggle("dark", dark);
+            } catch (e) {
+                // If anything goes wrong, fall back to system preference
+                const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+                document.documentElement.classList.toggle("dark", prefersDark);
+            }
+        })();
+    </script>
+
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
@@ -115,7 +133,6 @@
             const bingo = hasBingo(marked);
             const highlighted = indicesInBingo(marked);
 
-            // Fire confetti once per bingo
             useEffect(() => {
                 if (bingo && !didBingo) {
                     setDidBingo(true);
@@ -169,10 +186,9 @@
         function App() {
             const [seed, setSeed] = useState(getInitialSeed);
             const [count, setCount] = useState(1);
-            const [dark, setDark] = useState(
-                () => localStorage.getItem("hh-dark") === "1" ||
-                    document.documentElement.classList.contains("dark")
-            );
+
+            // Initialize React state for theme from the actual <html> class
+            const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
 
             // keep URL + LS in sync with the current seed
             useEffect(() => {
@@ -182,7 +198,7 @@
                 localStorage.setItem("hh-seed", String(seed));
             }, [seed]);
 
-            // persist dark mode
+            // persist dark mode + flip the <html> class
             useEffect(() => {
                 document.documentElement.classList.toggle("dark", dark);
                 localStorage.setItem("hh-dark", dark ? "1" : "0");
