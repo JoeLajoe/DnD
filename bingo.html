@@ -6,10 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Hallowed Hand Bingo</title>
 
-    <script>
-        tailwind = { config: { darkMode: 'class' } };
-    </script>
+    <script>tailwind = { config: { darkMode: 'class' } };</script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
 
     <style>
         @media print {
@@ -25,23 +24,55 @@
                 background: white
             }
         }
+
+        /* Screensaver overlay */
+        .ss-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 6, 23, 0.95);
+            display: none;
+            z-index: 50;
+            cursor: none;
+        }
+
+        .ss-box {
+            position: absolute;
+            width: 160px;
+            height: 160px;
+            display: grid;
+            place-items: center;
+            user-select: none;
+            pointer-events: none;
+        }
+
+        .spin-slow {
+            animation: spin 18s linear infinite;
+            will-change: transform;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
     </style>
 </head>
 
 <body class="min-h-screen bg-slate-900 text-slate-100">
-    <noscript>
-        <div class="max-w-2xl mx-auto p-6">This page requires JavaScript.</div>
-    </noscript>
     <div id="root"></div>
 
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
 
     <script type="text/babel">
-        const { useMemo, useState, useEffect } = React;
+        const { useMemo, useState, useEffect, useRef } = React;
 
+        // ======= Data =======
         const ENTRIES = [
             "Forgets their turn", "This might be a trap", "Nat 20 save", "Checks coin / magic item", "Melee complains about ranged",
             "Potion used in combat", "Argues about routes", "Crit hit changes fight", "Complains about cold", "DM describes snow",
@@ -50,53 +81,20 @@
             "Nat 1 fail", "Finds something unexpected", "Timer runs out", "Discovers a mysterious clue", "Tries to talk their way out of trouble", "Tries to bribe their way out of trouble",
         ];
 
-        function mulberry32(seed) {
-            let a = seed >>> 0;
-            return function () {
-                a |= 0; a = (a + 0x6D2B79F5) | 0;
-                let t = Math.imul(a ^ a >>> 15, 1 | a);
-                t = (t + Math.imul(t ^ t >>> 7, 61 | t)) ^ t;
-                return ((t ^ t >>> 14) >>> 0) / 4294967296;
-            };
-        }
-        function shuffle(arr, rng) {
-            const a = arr.slice();
-            for (let i = a.length - 1; i > 0; i--) {
-                const j = Math.floor(rng() * (i + 1));
-                [a[i], a[j]] = [a[j], a[i]];
-            }
-            return a;
-        }
-        function buildBoard(rng) {
-            const pool = shuffle(ENTRIES, rng).slice(0, 24);
-            return [...pool.slice(0, 12), "FREE", ...pool.slice(12)];
-        }
+        // ======= RNG / Board helpers =======
+        function mulberry32(seed) { let a = seed >>> 0; return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = (t + Math.imul(t ^ t >>> 7, 61 | t)) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+        function shuffle(arr, rng) { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1));[a[i], a[j]] = [a[j], a[i]]; } return a; }
+        function buildBoard(rng) { const pool = shuffle(ENTRIES, rng).slice(0, 24); return [...pool.slice(0, 12), "FREE", ...pool.slice(12)]; }
 
-        const LINES = (() => {
-            const lines = [];
-            for (let r = 0; r < 5; r++) lines.push([0, 1, 2, 3, 4].map(c => r * 5 + c));
-            for (let c = 0; c < 5; c++) lines.push([0, 1, 2, 3, 4].map(r => r * 5 + c));
-            lines.push([0, 6, 12, 18, 24]); lines.push([4, 8, 12, 16, 20]);
-            return lines;
-        })();
-        function hasBingo(marked) { return LINES.some(line => line.every(i => marked[i])); }
-        function indicesInBingo(marked) {
-            const set = new Set();
-            LINES.forEach(line => { if (line.every(i => marked[i])) line.forEach(i => set.add(i)); });
-            return set;
-        }
+        // ======= Bingo lines =======
+        const LINES = (() => { const lines = []; for (let r = 0; r < 5; r++)lines.push([0, 1, 2, 3, 4].map(c => r * 5 + c)); for (let c = 0; c < 5; c++)lines.push([0, 1, 2, 3, 4].map(r => r * 5 + c)); lines.push([0, 6, 12, 18, 24]); lines.push([4, 8, 12, 16, 20]); return lines; })();
+        const hasBingo = marked => LINES.some(line => line.every(i => marked[i]));
+        function indicesInBingo(marked) { const set = new Set(); LINES.forEach(line => { if (line.every(i => marked[i])) line.forEach(i => set.add(i)); }); return set; }
 
-        function getInitialSeed() {
-            const url = new URL(window.location.href);
-            const fromUrl = url.searchParams.get("seed");
-            if (fromUrl && !Number.isNaN(parseInt(fromUrl, 10))) return parseInt(fromUrl, 10);
+        // ======= Same-device persistence: seed in URL + localStorage =======
+        function getInitialSeed() { const url = new URL(window.location.href); const u = url.searchParams.get("seed"); if (u && !Number.isNaN(parseInt(u, 10))) return parseInt(u, 10); const ls = localStorage.getItem("hh-seed"); if (ls && !Number.isNaN(parseInt(ls, 10))) return parseInt(ls, 10); return Math.floor(Math.random() * 2 ** 31); }
 
-            const fromLS = localStorage.getItem("hh-seed");
-            if (fromLS && !Number.isNaN(parseInt(fromLS, 10))) return parseInt(fromLS, 10);
-
-            return Math.floor(Math.random() * 2 ** 31);
-        }
-
+        // ======= Bingo Grid =======
         function BingoGrid({ cells, boardKey }) {
             const stored = localStorage.getItem(boardKey);
             const initial = stored ? JSON.parse(stored) : Array(25).fill(false);
@@ -110,23 +108,16 @@
             const bingo = hasBingo(marked);
             const highlighted = indicesInBingo(marked);
 
-            useEffect(() => {
-                if (bingo && !didBingo) {
-                    setDidBingo(true);
-                    confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } });
-                }
-            }, [bingo, didBingo]);
+            useEffect(() => { if (bingo && !didBingo) { setDidBingo(true); confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } }); } }, [bingo, didBingo]);
 
-            function toggle(i) { setMarked(m => { const copy = m.slice(); copy[i] = !copy[i]; return copy; }); }
+            function toggle(i) { setMarked(m => { const c = m.slice(); c[i] = !c[i]; return c; }); }
             function clearAll() { setMarked(Array(25).fill(false).map((_, i) => i === 12)); setDidBingo(false); }
 
             return (
                 <div>
                     <div className="grid grid-cols-5 gap-1 sm:gap-2 select-none w-full">
                         {Array.from({ length: 25 }).map((_, i) => {
-                            const isMarked = marked[i];
-                            const isFree = i === 12;
-                            const inBingo = highlighted.has(i);
+                            const isMarked = marked[i], isFree = i === 12, inBingo = highlighted.has(i);
                             return (
                                 <button
                                     key={i}
@@ -138,10 +129,10 @@
                                         "text-[11px] sm:text-xs md:text-sm leading-snug whitespace-pre-line " +
                                         "transition select-none " +
                                         (inBingo
-                                            ? "bg-green-300 border-green-500 "
+                                            ? "bg-green-600 border-green-400 text-white "
                                             : isMarked
-                                                ? "bg-blue-200 border-blue-400 "
-                                                : "bg-slate-800 border-slate-700 text-slate-100 "
+                                                ? "bg-blue-600 border-blue-400 text-white "
+                                                : "bg-slate-700 border-slate-600 text-slate-100 "
                                         ) +
                                         (isFree ? "font-semibold " : "") +
                                         "hover:shadow-sm active:scale-[0.99]"
@@ -153,13 +144,121 @@
                         })}
                     </div>
                     <div className="flex gap-2 mt-3">
-                        <button onClick={clearAll} className="px-3 py-2 rounded-2xl bg-slate-800 border shadow">Clear</button>
-                        {hasBingo(marked) && <span className="px-3 py-2 rounded-2xl bg-emerald-600 text-white">BINGO!</span>}
+                        <button onClick={clearAll} className="px-3 py-2 rounded-2xl bg-slate-800 border border-slate-600 text-slate-100 shadow hover:bg-slate-700">Clear</button>
+                        {hasBingo(marked) && <span className="px-3 py-2 rounded-2xl bg-green-600 text-white">BINGO!</span>}
                     </div>
                 </div>
             );
         }
 
+        // ======= Screensaver (DVD bounce with PNG d20 + colorize hue-rotate) =======
+        function useScreensaver({ idleMs = 30000 } = {}) {
+            const overlayRef = useRef(null);
+            const logoRef = useRef(null);
+            const hueRef = useRef(0);
+            const rafRef = useRef(0);
+            const activeRef = useRef(false);
+            const state = useRef({ x: 120, y: 120, vx: 220, vy: 180, lastT: 0 });
+
+            const BASE_COLORIZE = "sepia(1) saturate(700%) brightness(1.02) contrast(1.05)";
+
+            function applyHue(h) {
+                if (logoRef.current) {
+                    logoRef.current.style.filter = `${BASE_COLORIZE} hue-rotate(${h}deg)`;
+                }
+            }
+
+            function start() {
+                if (!overlayRef.current || !logoRef.current) return;
+                overlayRef.current.style.display = "block";
+                activeRef.current = true;
+                applyHue(hueRef.current); // init color
+                state.current.lastT = performance.now();
+                rafRef.current = requestAnimationFrame(tick);
+            }
+            function stop() {
+                activeRef.current = false;
+                cancelAnimationFrame(rafRef.current);
+                if (overlayRef.current) overlayRef.current.style.display = "none";
+            }
+            function bumpHue() {
+                hueRef.current = (hueRef.current + 37) % 360; // pleasant step
+                applyHue(hueRef.current);
+            }
+
+            function tick(t) {
+                if (!activeRef.current) return;
+                const logo = logoRef.current, overlay = overlayRef.current;
+                const dt = (t - state.current.lastT) / 1000;
+                state.current.lastT = t;
+
+                const W = overlay.clientWidth, H = overlay.clientHeight;
+                const w = logo.clientWidth, h = logo.clientHeight;
+
+                let { x, y, vx, vy } = state.current;
+                x += vx * dt; y += vy * dt;
+
+                let hitX = false, hitY = false;
+                if (x <= 0) { x = 0; vx = Math.abs(vx); hitX = true; }
+                else if (x + w >= W) { x = W - w; vx = -Math.abs(vx); hitX = true; }
+
+                if (y <= 0) { y = 0; vy = Math.abs(vy); hitY = true; }
+                else if (y + h >= H) { y = H - h; vy = -Math.abs(vy); hitY = true; }
+
+                if (hitX || hitY) bumpHue();
+                if (hitX && hitY) confetti({ particleCount: 80, spread: 60, origin: { y: 0.2 } });
+
+                logo.style.transform = `translate(${x}px, ${y}px)`;
+                state.current = { x, y, vx, vy, lastT: t };
+                rafRef.current = requestAnimationFrame(tick);
+            }
+
+            useEffect(() => {
+                let timer = 0;
+                const reset = () => { stop(); clearTimeout(timer); timer = setTimeout(start, idleMs); };
+                reset();
+
+                const events = ["pointerdown", "pointermove", "keydown", "wheel", "scroll", "touchstart"];
+                events.forEach(ev => addEventListener(ev, reset, { passive: true }));
+                const hide = () => stop();
+                document.addEventListener("pointerdown", hide);
+
+                return () => {
+                    clearTimeout(timer);
+                    events.forEach(ev => removeEventListener(ev, reset));
+                    document.removeEventListener("pointerdown", hide);
+                    stop();
+                };
+            }, [idleMs]);
+
+            return { overlayRef, logoRef };
+        }
+
+        function D20PNG(props) {
+            return (
+                <img
+                    src="images/d20.png"  /* change to 'images/d20.png' if you put it in /images */
+                    alt="D20"
+                    {...props}
+                    style={{ width: "100%", height: "100%", objectFit: "contain", userSelect: "none", pointerEvents: "none" }}
+                />
+            );
+        }
+
+        function ScreensaverD20() {
+            const { overlayRef, logoRef } = useScreensaver({ idleMs: 60000 });
+            return (
+                <div ref={overlayRef} className="ss-overlay">
+                    <div ref={logoRef} className="ss-box">
+                        <div className="spin-slow w-full h-full">
+                            <D20PNG />
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ======= App =======
         function App() {
             const [seed, setSeed] = useState(getInitialSeed);
             const [count, setCount] = useState(1);
@@ -176,7 +275,7 @@
                 return Array.from({ length: count }, (_, idx) => ({ idx, cells: buildBoard(rng) }));
             }, [seed, count]);
 
-            function randomize() { setSeed(Math.floor(Math.random() * 2 ** 31)); }
+            const randomize = () => setSeed(Math.floor(Math.random() * 2 ** 31));
 
             return (
                 <div className="p-4 sm:p-6">
@@ -184,17 +283,20 @@
                         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6 print:hidden">
                             <div>
                                 <h1 className="text-3xl font-bold">Hallowed Hand - Bingo</h1>
-                                <p className="text-sm text-slate-400">
-                                    Click squares to mark them. Hit Randomize to get your unique board.
-                                </p>
+                                <p className="text-sm text-slate-300">Click squares to mark them. Hit Randomize to get your unique board.</p>
                             </div>
                             <div className="flex gap-2">
-                                <button onClick={randomize} className="px-4 py-2 rounded-2xl bg-slate-900 text-white shadow">Randomize</button>
+                                <button
+                                    onClick={randomize}
+                                    className="px-4 py-2 rounded-2xl bg-slate-800 border border-slate-600 text-slate-100 shadow hover:bg-slate-700"
+                                >
+                                    Randomize
+                                </button>
                             </div>
                         </div>
 
                         {boards.map(({ cells, idx }) => (
-                            <div key={idx} className="bg-slate-800 rounded-2xl shadow p-4 print:avoid-break max-w-2xl w-[min(92vw,42rem)] mx-auto">
+                            <div key={idx} className="bg-slate-800 rounded-2xl shadow p-4 print:avoid-break max-w-2xl w-[min(92vw,42rem)] mx-auto border border-slate-700">
                                 <div className="flex items-baseline justify-between mb-3">
                                     <h2 className="text-xl font-semibold">Your Board</h2>
                                     <span className="text-xs text-slate-400">seed:{seed}</span>
@@ -204,12 +306,14 @@
                             </div>
                         ))}
                     </div>
+
+                    {/* Screensaver overlay */}
+                    <ScreensaverD20 />
                 </div>
             );
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
 
